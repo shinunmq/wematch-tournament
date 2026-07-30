@@ -6,7 +6,7 @@
     <title>WEMATCH: Yönetim Paneli</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue 3 (Otomasyon ve Etkileşim için) -->
+    <!-- Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -61,6 +61,11 @@
         /* Vue Modal Transition */
         .modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
         .modal-enter-from, .modal-leave-to { opacity: 0; }
+        
+        /* Input Number Hide Arrows */
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -74,7 +79,7 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-lg flex items-center justify-center font-black text-xl shadow-[0_0_10px_rgba(59,130,246,0.6)]">W</div>
                     <h1 class="text-xl md:text-2xl font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
-                        WEMATCH: <span class="text-slate-300">18 KİŞİ YÖNETİMİ</span>
+                        WEMATCH: <span class="text-slate-300">{{ tournamentMode ? tournamentMode + ' KİŞİ YÖNETİMİ' : 'SECOND SELECTION' }}</span>
                     </h1>
                 </div>
                 
@@ -83,22 +88,60 @@
                         <span v-if="broadcastMode">🔴 YAYIN MODU AÇIK</span>
                         <span v-else>👁️ YAYIN MODUNA GEÇ</span>
                     </button>
-                    <button @click="confirmReset" class="px-4 py-2 bg-red-600/20 border border-red-900 text-red-400 rounded hover:bg-red-600/40 transition-colors">
+                    <button v-if="appState !== 'mode_select'" @click="confirmReset" class="px-4 py-2 bg-red-600/20 border border-red-900 text-red-400 rounded hover:bg-red-600/40 transition-colors">
                         🔄 SIFIRLA
                     </button>
                 </div>
             </div>
         </nav>
 
-        <!-- KURULUM EKRANI -->
+        <!-- YENİ MOD SEÇİM EKRANI (SAYI GİRİŞİ) -->
+        <div v-if="appState === 'mode_select'" class="max-w-4xl mx-auto px-4 py-20 text-center">
+            <h2 class="text-5xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">TURNUVA BÜYÜKLÜĞÜ</h2>
+            <p class="text-slate-400 text-xl mb-12">Sahaya kaç egoist iniyor? (Direkt sayıyı yazın)</p>
+            
+            <div class="flex flex-col items-center justify-center bg-slate-800/50 p-12 rounded-3xl border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.1)]">
+                
+                <!-- Numara Giriş Alanı -->
+                <div class="flex items-center gap-6 mb-6">
+                    <button @click="inputPlayerCount -= 1" class="w-16 h-16 rounded-full bg-slate-900 border border-slate-600 text-4xl text-slate-400 hover:text-white hover:border-blue-400 hover:bg-slate-800 transition-all flex items-center justify-center pb-2">-</button>
+                    
+                    <input type="number" v-model.number="inputPlayerCount" class="text-8xl font-black text-center bg-transparent border-b-4 border-blue-500 focus:border-cyan-300 outline-none w-48 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 transition-all">
+                    
+                    <button @click="inputPlayerCount += 1" class="w-16 h-16 rounded-full bg-slate-900 border border-slate-600 text-4xl text-slate-400 hover:text-white hover:border-blue-400 hover:bg-slate-800 transition-all flex items-center justify-center pb-2">+</button>
+                </div>
+
+                <!-- Durum Mesajları -->
+                <div class="h-16 flex items-center justify-center text-lg font-bold">
+                    <div v-if="!inputPlayerCount || inputPlayerCount <= 0" class="text-slate-500">Lütfen geçerli bir sayı girin.</div>
+                    <div v-else-if="inputPlayerCount % 3 !== 0" class="text-red-400 bg-red-900/30 px-4 py-2 rounded-lg border border-red-500/50">⚠️ Takımlar 3'er kişilik olacağı için sayı 3'e tam bölünmeli!</div>
+                    <div v-else-if="inputPlayerCount === 12" class="text-green-400 bg-green-900/30 px-4 py-2 rounded-lg border border-green-500/50">✨ 12 Kişi (4 Takım) - Hızlı Mod. 2 Takım Mezun Olur, 2 Kişi Elenir.</div>
+                    <div v-else-if="inputPlayerCount === 18" class="text-blue-400 bg-blue-900/30 px-4 py-2 rounded-lg border border-blue-500/50">🔥 18 Kişi (6 Takım) - Standart Mod. 3 Takım Mezun Olur, 3 Kişi Elenir.</div>
+                    <div v-else-if="inputPlayerCount === 24" class="text-purple-400 bg-purple-900/30 px-4 py-2 rounded-lg border border-purple-500/50">👑 24 Kişi (8 Takım) - Büyük Mod. 4 Takım Mezun Olur, 4 Kişi Elenir.</div>
+                    <div v-else class="text-yellow-400 bg-yellow-900/30 px-4 py-2 rounded-lg border border-yellow-500/50 text-sm max-w-md">
+                        Blue Lock "Çalma/Eleme" eşleşme matematiği kusursuz simetri için 12, 18 veya 24 kişiye ihtiyaç duyar. Lütfen bu sayılardan birini seçin.
+                    </div>
+                </div>
+
+                <!-- Başlat Butonu -->
+                <button 
+                    @click="confirmPlayerCount" 
+                    :disabled="!isValidMode"
+                    class="mt-10 px-10 py-5 rounded-2xl font-black text-2xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                    :class="isValidMode ? 'bg-blue-600 hover:bg-blue-500 text-white hover:scale-105 hover:shadow-[0_0_30px_rgba(59,130,246,0.6)]' : 'bg-slate-700 text-slate-400'">
+                    TAKIMLARI OLUŞTUR ➔
+                </button>
+            </div>
+        </div>
+
+        <!-- KURULUM EKRANI (TAKIM GİRİŞLERİ) -->
         <div v-if="appState === 'setup'" class="max-w-5xl mx-auto px-4 py-12">
             <div class="text-center mb-10">
-                <h2 class="text-4xl font-black mb-3">OYUNCU GİRİŞİ</h2>
-                <p class="text-slate-400">18 Oyuncuyu başlangıçtaki 3'er kişilik takımlarına yerleştir.</p>
+                <h2 class="text-4xl font-black mb-3">OYUNCU GİRİŞİ ({{ tournamentMode }} KİŞİ)</h2>
+                <p class="text-slate-400">{{ tournamentMode }} Oyuncuyu başlangıçtaki 3'er kişilik takımlarına yerleştir.</p>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Takım Kartları -->
                 <div v-for="(team, key) in baseTeams" :key="key" class="bg-slate-800/80 border border-slate-700 p-5 rounded-xl">
                     <h3 class="text-blue-400 font-bold text-xl mb-4 border-b border-slate-700 pb-2">Takım {{ key }}</h3>
                     <div class="flex flex-col gap-3">
@@ -116,10 +159,51 @@
             </div>
         </div>
 
-        <!-- TURNUVA AĞACI (BRACKET) -->
-        <div v-if="appState === 'tournament'" class="max-w-6xl mx-auto stage-container mt-12 px-4 md:px-8">
+        <!-- TURNUVA AĞACI - 12 KİŞİ (HIZLI MOD) -->
+        <div v-if="appState === 'tournament' && tournamentMode === 12" class="max-w-6xl mx-auto stage-container mt-12 px-4 md:px-8">
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-blue-900/50 inline-block px-6 py-2 rounded-full border border-blue-500 font-bold text-xl mb-8 sticky top-20 z-10 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                    1. AŞAMA: İLK ÇARPIŞMA (3v3)
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <match-card match-id="M1" title="MAÇ 1" team1-key="A" team2-key="B" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal"></match-card>
+                    <match-card match-id="M2" title="MAÇ 2" team1-key="C" team2-key="D" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal"></match-card>
+                </div>
+            </div>
+
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-purple-900/50 inline-block px-6 py-2 rounded-full border border-purple-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(168,85,247,0.5)]">
+                    2. AŞAMA: AYRIŞMA
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-blue-400 font-bold text-lg mb-3">ÜST TUR (4v4)</h3>
+                        <match-card match-id="M3" title="MAÇ 3 (KAZANAN MEZUN)" team1-key="M1W" team2-key="M2W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" badge="GRAD"></match-card>
+                    </div>
+                    <div>
+                        <h3 class="text-red-400 font-bold text-lg mb-3">ALT TUR (2v2)</h3>
+                        <match-card match-id="M4" title="MAÇ 4 (KAYBEDEN ELENİR)" team1-key="M1L" team2-key="M2L" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-red-500" badge="ELIM"></match-card>
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative md:ml-0 ml-12">
+                <div class="bg-red-900/60 inline-block px-8 py-3 rounded-full border-2 border-red-500 font-black text-2xl mb-8 z-10 shadow-[0_0_25px_rgba(239,68,68,0.6)]">
+                    3. AŞAMA: BÜYÜK FİNAL (Deathmatch)
+                </div>
+                <div class="max-w-2xl mx-auto">
+                    <match-card match-id="M5" title="MAÇ 5 (2 KİŞİ ÇALINIR)" team1-key="M3L" team2-key="M4W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-8 border-t-red-600 bg-gradient-to-b from-slate-800 to-slate-900 shadow-[0_0_20px_rgba(239,68,68,0.3)]" badge="FINAL_12"></match-card>
+                </div>
+            </div>
             
-            <!-- AŞAMA 1 -->
+            <div v-if="isTournamentOver && tournamentMode === 12" class="mt-20 text-center p-10 bg-green-900/30 border-2 border-green-500 rounded-2xl pulse-grad">
+                <h2 class="text-5xl font-black text-green-400 mb-4">TURNUVA TAMAMLANDI!</h2>
+                <p class="text-xl text-slate-300">12 oyuncuyla başlayan hızlı mod sona erdi. 2 takım (10 Kişi) mezun oldu, 2 kişi elendi.</p>
+            </div>
+        </div>
+
+        <!-- TURNUVA AĞACI - 18 KİŞİ -->
+        <div v-if="appState === 'tournament' && tournamentMode === 18" class="max-w-6xl mx-auto stage-container mt-12 px-4 md:px-8">
             <div class="relative mb-20 md:ml-0 ml-12">
                 <div class="bg-blue-900/50 inline-block px-6 py-2 rounded-full border border-blue-500 font-bold text-xl mb-8 sticky top-20 z-10 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
                     1. AŞAMA: İLK ÇARPIŞMA (3v3)
@@ -131,7 +215,6 @@
                 </div>
             </div>
 
-            <!-- AŞAMA 2 -->
             <div class="relative mb-20 md:ml-0 ml-12">
                 <div class="bg-purple-900/50 inline-block px-6 py-2 rounded-full border border-purple-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(168,85,247,0.5)]">
                     2. AŞAMA: AYRIŞMA
@@ -148,7 +231,6 @@
                 </div>
             </div>
 
-            <!-- AŞAMA 3 -->
             <div class="relative mb-20 md:ml-0 ml-12">
                 <div class="bg-indigo-900/50 inline-block px-6 py-2 rounded-full border border-indigo-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(99,102,241,0.5)]">
                     3. AŞAMA: ORTA SAHA (3v3)
@@ -158,10 +240,9 @@
                 </div>
             </div>
 
-            <!-- AŞAMA 4 -->
             <div class="relative mb-20 md:ml-0 ml-12">
                 <div class="bg-cyan-900/50 inline-block px-6 py-2 rounded-full border border-cyan-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(6,182,212,0.5)]">
-                    4. AŞAMA: İKİNCİ DALGA (Bay Takımlar Geliyor)
+                    4. AŞAMA: İKİNCİ DALGA
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <match-card match-id="M7" title="MAÇ 7 (KAZANAN MEZUN)" team1-key="M3W" team2-key="M6W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" badge="GRAD"></match-card>
@@ -169,7 +250,6 @@
                 </div>
             </div>
 
-            <!-- AŞAMA 5 -->
             <div class="relative md:ml-0 ml-12">
                 <div class="bg-red-900/60 inline-block px-8 py-3 rounded-full border-2 border-red-500 font-black text-2xl mb-8 z-10 shadow-[0_0_25px_rgba(239,68,68,0.6)]">
                     5. AŞAMA: BÜYÜK FİNAL (Deathmatch)
@@ -179,10 +259,76 @@
                 </div>
             </div>
             
-            <!-- Turnuva Özeti -->
-            <div v-if="isTournamentOver" class="mt-20 text-center p-10 bg-green-900/30 border-2 border-green-500 rounded-2xl pulse-grad">
+            <div v-if="isTournamentOver && tournamentMode === 18" class="mt-20 text-center p-10 bg-green-900/30 border-2 border-green-500 rounded-2xl pulse-grad">
                 <h2 class="text-5xl font-black text-green-400 mb-4">TURNUVA TAMAMLANDI!</h2>
                 <p class="text-xl text-slate-300">18 oyuncuyla başlayan sınav sona erdi. 3 takım (15 Kişi) mezun oldu, 3 kişi elendi.</p>
+            </div>
+        </div>
+
+        <!-- TURNUVA AĞACI - 24 KİŞİ -->
+        <div v-if="appState === 'tournament' && tournamentMode === 24" class="max-w-6xl mx-auto stage-container mt-12 px-4 md:px-8">
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-blue-900/50 inline-block px-6 py-2 rounded-full border border-blue-500 font-bold text-xl mb-8 sticky top-20 z-10 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                    1. AŞAMA: İLK ÇARPIŞMA (3v3)
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <match-card match-id="M1" title="MAÇ 1" team1-key="A" team2-key="B" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal"></match-card>
+                    <match-card match-id="M2" title="MAÇ 2" team1-key="C" team2-key="D" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal"></match-card>
+                    <match-card match-id="M3" title="MAÇ 3" team1-key="E" team2-key="F" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal"></match-card>
+                    <match-card match-id="M4" title="MAÇ 4" team1-key="G" team2-key="H" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal"></match-card>
+                </div>
+            </div>
+
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-purple-900/50 inline-block px-6 py-2 rounded-full border border-purple-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(168,85,247,0.5)]">
+                    2. AŞAMA: AYRIŞMA (Bay Yok)
+                </div>
+                
+                <h3 class="text-blue-400 font-bold text-xl mb-4 flex items-center gap-2">ÜST TUR (4v4)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <match-card match-id="M5" title="MAÇ 5 (KAZANAN MEZUN)" team1-key="M1W" team2-key="M2W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" badge="GRAD"></match-card>
+                    <match-card match-id="M6" title="MAÇ 6 (KAZANAN MEZUN)" team1-key="M3W" team2-key="M4W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" badge="GRAD"></match-card>
+                </div>
+
+                <h3 class="text-red-400 font-bold text-xl mb-4 flex items-center gap-2">ALT TUR (2v2)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <match-card match-id="M7" title="MAÇ 7 (KAYBEDEN ELENİR)" team1-key="M1L" team2-key="M2L" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-red-500" badge="ELIM"></match-card>
+                    <match-card match-id="M8" title="MAÇ 8 (KAYBEDEN ELENİR)" team1-key="M3L" team2-key="M4L" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-red-500" badge="ELIM"></match-card>
+                </div>
+            </div>
+
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-indigo-900/50 inline-block px-6 py-2 rounded-full border border-indigo-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+                    3. AŞAMA: ORTA SAHA (3v3)
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <match-card match-id="M9" title="MAÇ 9" team1-key="M5L" team2-key="M7W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-purple-500"></match-card>
+                    <match-card match-id="M10" title="MAÇ 10" team1-key="M6L" team2-key="M8W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-purple-500"></match-card>
+                </div>
+            </div>
+
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-cyan-900/50 inline-block px-6 py-2 rounded-full border border-cyan-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+                    4. AŞAMA: İKİNCİ DALGA
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <match-card match-id="M11" title="MAÇ 11 (KAZANAN MEZUN)" team1-key="M9W" team2-key="M10W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" badge="GRAD"></match-card>
+                    <match-card match-id="M12" title="MAÇ 12 (KAYBEDEN ELENİR)" team1-key="M9L" team2-key="M10L" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-red-500" badge="ELIM"></match-card>
+                </div>
+            </div>
+
+            <div class="relative md:ml-0 ml-12">
+                <div class="bg-red-900/60 inline-block px-8 py-3 rounded-full border-2 border-red-500 font-black text-2xl mb-8 z-10 shadow-[0_0_25px_rgba(239,68,68,0.6)]">
+                    5. AŞAMA: BÜYÜK FİNAL (Deathmatch)
+                </div>
+                <div class="max-w-2xl mx-auto">
+                    <match-card match-id="M13" title="MAÇ 13 (2 KİŞİ ÇALINIR)" team1-key="M11L" team2-key="M12W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-8 border-t-red-600 bg-gradient-to-b from-slate-800 to-slate-900 shadow-[0_0_20px_rgba(239,68,68,0.3)]" badge="FINAL_24"></match-card>
+                </div>
+            </div>
+            
+            <div v-if="isTournamentOver && tournamentMode === 24" class="mt-20 text-center p-10 bg-purple-900/30 border-2 border-purple-500 rounded-2xl pulse-grad">
+                <h2 class="text-5xl font-black text-purple-400 mb-4">TURNUVA TAMAMLANDI!</h2>
+                <p class="text-xl text-slate-300">24 oyuncuyla başlayan sınav sona erdi. 4 takım (20 Kişi) mezun oldu, 4 kişi elendi.</p>
             </div>
         </div>
 
@@ -195,7 +341,6 @@
                     </div>
                     
                     <div class="p-6">
-                        <!-- Adım 1: Kazananı Seç -->
                         <div class="mb-6">
                             <h4 class="text-slate-400 text-sm uppercase tracking-wider font-bold mb-3">1. Kim Kazandı?</h4>
                             <div class="grid grid-cols-2 gap-4">
@@ -208,7 +353,6 @@
                             </div>
                         </div>
 
-                        <!-- Adım 2: Çalınacak Oyuncuyu Seç -->
                         <div v-if="modalForm.winner" class="mb-6">
                             <h4 class="text-slate-400 text-sm uppercase tracking-wider font-bold mb-3 flex justify-between">
                                 <span>2. Kim Çalınacak? (Kaybedenden)</span>
@@ -224,12 +368,6 @@
                                 </label>
                             </div>
                         </div>
-
-                        <!-- Hata / Uyarı Mesajı -->
-                        <div v-if="modalError" class="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded mb-4 text-sm font-semibold text-center">
-                            {{ modalError }}
-                        </div>
-
                     </div>
                     
                     <div class="bg-slate-900 p-4 border-t border-slate-700 flex justify-end gap-3">
@@ -256,9 +394,7 @@
                         <div v-else class="text-xs bg-slate-800 text-slate-500 px-2 py-1 rounded font-bold">HAZIR DEĞİL</div>
                     </div>
                     
-                    <!-- Takımlar -->
                     <div class="flex flex-col gap-2 bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-4 relative">
-                        <!-- Takım 1 -->
                         <div class="p-2 rounded" :class="getWinnerClass('t1')">
                             <div class="font-bold mb-1 flex justify-between items-center text-sm">
                                 <span>{{ team1Name }}</span>
@@ -273,7 +409,6 @@
                         
                         <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black text-red-500 font-black italic text-xs px-2 py-1 rounded border border-slate-700 z-10">VS</div>
                         
-                        <!-- Takım 2 -->
                         <div class="p-2 rounded mt-1" :class="getWinnerClass('t2')">
                             <div class="font-bold mb-1 flex justify-between items-center text-sm">
                                 <span>{{ team2Name }}</span>
@@ -287,7 +422,6 @@
                         </div>
                     </div>
                     
-                    <!-- Eylem Alanı (Sadece Yayın Modu Kapalıysa) -->
                     <div v-if="!broadcast" class="mt-4 border-t border-slate-700/50 pt-3">
                         <button v-if="isReady && !isPlayed" @click="$emit('open-modal', matchId)" class="w-full py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/50 rounded font-bold transition-colors">
                             ⚔️ MAÇI OYNA
@@ -302,10 +436,11 @@
                         </div>
                     </div>
                     
-                    <!-- Çıktı Bilgisi (Özel Durumlar) -->
                     <div v-if="badge === 'GRAD' && isPlayed" class="mt-2 bg-green-600 text-white py-1.5 rounded font-bold text-center text-sm pulse-grad">🌟 KAZANAN MEZUN!</div>
                     <div v-if="badge === 'ELIM' && isPlayed" class="mt-2 bg-black text-slate-500 border border-slate-800 py-1.5 rounded font-bold text-center text-sm">❌ KAYBEDEN ELENDİ</div>
+                    <div v-if="badge === 'FINAL_12' && isPlayed" class="mt-2 bg-blue-600 text-white py-1.5 rounded font-bold text-center text-sm pulse-grad">👑 2. TAKIM MEZUN OLDU!</div>
                     <div v-if="badge === 'FINAL' && isPlayed" class="mt-2 bg-green-600 text-white py-1.5 rounded font-bold text-center text-sm pulse-grad">👑 3. TAKIM MEZUN OLDU!</div>
+                    <div v-if="badge === 'FINAL_24' && isPlayed" class="mt-2 bg-purple-600 text-white py-1.5 rounded font-bold text-center text-sm pulse-grad">👑 4. TAKIM MEZUN OLDU!</div>
                 </div>
             `,
             computed: {
@@ -336,57 +471,98 @@
             components: { 'match-card': MatchCard },
             data() {
                 return {
-                    appState: 'setup', // 'setup' | 'tournament'
+                    appState: 'mode_select',
+                    inputPlayerCount: 18, // Kullanıcının girdiği sayı
+                    tournamentMode: null, // Doğrulanan mod (12, 18, 24)
                     broadcastMode: false,
-                    baseTeams: {
-                        A: ['Isagi', 'Nagi', 'Bachira'],
-                        B: ['Barou', 'Naruhaya', 'Chigiri'],
-                        C: ['Rin', 'Aryu', 'Tokimitsu'],
-                        D: ['Kunigami', 'Reo', 'Kurona'],
-                        E: ['Zantetsu', 'Niko', 'Hiori'],
-                        F: ['Karasu', 'Otoya', 'Yukimiya']
-                    },
-                    matchResults: {}, // { M1: { winner: 't1', stolen: ['Nagi'] } }
+                    baseTeams: {},
+                    matchResults: {}, 
                     
-                    // Modal State
-                    activeMatch: null, // { id: 'M1', t1Key: 'A', t2Key: 'B', stealCount: 1 }
-                    modalForm: { winner: null, stolen: [] },
-                    modalError: ''
+                    activeMatch: null,
+                    modalForm: { winner: null, stolen: [] }
                 }
             },
             computed: {
-                // Merkezi Kadro Hesaplama (Ağacın Can Damarı)
+                isValidMode() {
+                    return [12, 18, 24].includes(this.inputPlayerCount);
+                },
                 rosters() {
-                    const r = { ...this.baseTeams }; // Başlangıç takımları (A, B, C...)
+                    const r = { ...this.baseTeams };
                     
-                    const matches = [
-                        { id: 'M1', outW: 'M1W', outL: 'M1L' },
-                        { id: 'M2', outW: 'M2W', outL: 'M2L' },
-                        { id: 'M3', outW: 'M3W', outL: 'M3L' }, // BAY (ama oynanıyor)
-                        { id: 'M4', outW: 'M4W', outL: 'M4L' },
-                        { id: 'M5', outW: 'M5W', outL: 'M5L' },
-                        { id: 'M6', outW: 'M6W', outL: 'M6L' },
-                        { id: 'M7', outW: 'M7W', outL: 'M7L' },
-                        { id: 'M8', outW: 'M8W', outL: 'M8L' },
-                        { id: 'M9', outW: 'M9W', outL: 'M9L' }
-                    ];
+                    let matches = [];
+                    if (this.tournamentMode === 12) {
+                        matches = [
+                            { id: 'M1', outW: 'M1W', outL: 'M1L' },
+                            { id: 'M2', outW: 'M2W', outL: 'M2L' },
+                            { id: 'M3', outW: 'M3W', outL: 'M3L' },
+                            { id: 'M4', outW: 'M4W', outL: 'M4L' },
+                            { id: 'M5', outW: 'M5W', outL: 'M5L' }
+                        ];
+                    } else if (this.tournamentMode === 18) {
+                        matches = [
+                            { id: 'M1', outW: 'M1W', outL: 'M1L' },
+                            { id: 'M2', outW: 'M2W', outL: 'M2L' },
+                            { id: 'M3', outW: 'M3W', outL: 'M3L' }, 
+                            { id: 'M4', outW: 'M4W', outL: 'M4L' },
+                            { id: 'M5', outW: 'M5W', outL: 'M5L' },
+                            { id: 'M6', outW: 'M6W', outL: 'M6L' },
+                            { id: 'M7', outW: 'M7W', outL: 'M7L' },
+                            { id: 'M8', outW: 'M8W', outL: 'M8L' },
+                            { id: 'M9', outW: 'M9W', outL: 'M9L' }
+                        ];
+                    } else if (this.tournamentMode === 24) {
+                        matches = [
+                            { id: 'M1', outW: 'M1W', outL: 'M1L' },
+                            { id: 'M2', outW: 'M2W', outL: 'M2L' },
+                            { id: 'M3', outW: 'M3W', outL: 'M3L' },
+                            { id: 'M4', outW: 'M4W', outL: 'M4L' },
+                            { id: 'M5', outW: 'M5W', outL: 'M5L' },
+                            { id: 'M6', outW: 'M6W', outL: 'M6L' }, 
+                            { id: 'M7', outW: 'M7W', outL: 'M7L' }, 
+                            { id: 'M8', outW: 'M8W', outL: 'M8L' }, 
+                            { id: 'M9', outW: 'M9W', outL: 'M9L' },
+                            { id: 'M10', outW: 'M10W', outL: 'M10L' },
+                            { id: 'M11', outW: 'M11W', outL: 'M11L' }, 
+                            { id: 'M12', outW: 'M12W', outL: 'M12L' }, 
+                            { id: 'M13', outW: 'M13W', outL: 'M13L' } 
+                        ];
+                    }
 
-                    // Her maç için, oynandıysa çıktı kadrolarını oluştur
-                    // Sırayla gitmek önemli çünkü sonraki maçlar öncekilere bağlı.
                     for (const m of matches) {
                         const res = this.matchResults[m.id];
                         if (res) {
-                            // Maçın t1 ve t2 keylerini bulmamız lazım. Bunu hardcode ile eşleştirelim.
                             let t1Key, t2Key;
-                            if(m.id==='M1') { t1Key='A'; t2Key='B'; }
-                            if(m.id==='M2') { t1Key='C'; t2Key='D'; }
-                            if(m.id==='M3') { t1Key='E'; t2Key='F'; }
-                            if(m.id==='M4') { t1Key='M1W'; t2Key='M2W'; }
-                            if(m.id==='M5') { t1Key='M1L'; t2Key='M2L'; }
-                            if(m.id==='M6') { t1Key='M4L'; t2Key='M5W'; }
-                            if(m.id==='M7') { t1Key='M3W'; t2Key='M6W'; }
-                            if(m.id==='M8') { t1Key='M3L'; t2Key='M6L'; }
-                            if(m.id==='M9') { t1Key='M7L'; t2Key='M8W'; }
+                            if (this.tournamentMode === 12) {
+                                if(m.id==='M1') { t1Key='A'; t2Key='B'; }
+                                if(m.id==='M2') { t1Key='C'; t2Key='D'; }
+                                if(m.id==='M3') { t1Key='M1W'; t2Key='M2W'; }
+                                if(m.id==='M4') { t1Key='M1L'; t2Key='M2L'; }
+                                if(m.id==='M5') { t1Key='M3L'; t2Key='M4W'; }
+                            } else if (this.tournamentMode === 18) {
+                                if(m.id==='M1') { t1Key='A'; t2Key='B'; }
+                                if(m.id==='M2') { t1Key='C'; t2Key='D'; }
+                                if(m.id==='M3') { t1Key='E'; t2Key='F'; }
+                                if(m.id==='M4') { t1Key='M1W'; t2Key='M2W'; }
+                                if(m.id==='M5') { t1Key='M1L'; t2Key='M2L'; }
+                                if(m.id==='M6') { t1Key='M4L'; t2Key='M5W'; }
+                                if(m.id==='M7') { t1Key='M3W'; t2Key='M6W'; }
+                                if(m.id==='M8') { t1Key='M3L'; t2Key='M6L'; }
+                                if(m.id==='M9') { t1Key='M7L'; t2Key='M8W'; }
+                            } else if (this.tournamentMode === 24) {
+                                if(m.id==='M1') { t1Key='A'; t2Key='B'; }
+                                if(m.id==='M2') { t1Key='C'; t2Key='D'; }
+                                if(m.id==='M3') { t1Key='E'; t2Key='F'; }
+                                if(m.id==='M4') { t1Key='G'; t2Key='H'; }
+                                if(m.id==='M5') { t1Key='M1W'; t2Key='M2W'; }
+                                if(m.id==='M6') { t1Key='M3W'; t2Key='M4W'; }
+                                if(m.id==='M7') { t1Key='M1L'; t2Key='M2L'; }
+                                if(m.id==='M8') { t1Key='M3L'; t2Key='M4L'; }
+                                if(m.id==='M9') { t1Key='M5L'; t2Key='M7W'; }
+                                if(m.id==='M10') { t1Key='M6L'; t2Key='M8W'; }
+                                if(m.id==='M11') { t1Key='M9W'; t2Key='M10W'; }
+                                if(m.id==='M12') { t1Key='M9L'; t2Key='M10L'; }
+                                if(m.id==='M13') { t1Key='M11L'; t2Key='M12W'; }
+                            }
 
                             const wKey = res.winner === 't1' ? t1Key : t2Key;
                             const lKey = res.winner === 't1' ? t2Key : t1Key;
@@ -394,7 +570,6 @@
                             const winnerRoster = [...(r[wKey] || [])];
                             const loserRoster = [...(r[lKey] || [])];
                             
-                            // Oyuncuları Çal
                             res.stolen.forEach(p => {
                                 winnerRoster.push(p);
                                 const index = loserRoster.indexOf(p);
@@ -412,12 +587,29 @@
                     return this.modalForm.stolen.length === this.activeMatch.stealCount;
                 },
                 isTournamentOver() {
-                    return !!this.matchResults['M9']; // Final maçı bittiyse biter
+                    if (this.tournamentMode === 12) return !!this.matchResults['M5'];
+                    if (this.tournamentMode === 18) return !!this.matchResults['M9'];
+                    if (this.tournamentMode === 24) return !!this.matchResults['M13'];
+                    return false;
                 }
             },
             methods: {
+                confirmPlayerCount() {
+                    if (!this.isValidMode) return;
+                    this.tournamentMode = this.inputPlayerCount;
+                    
+                    this.baseTeams = {};
+                    const teamCount = this.tournamentMode / 3;
+                    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                    
+                    for (let i = 0; i < teamCount; i++) {
+                        this.baseTeams[letters[i]] = ['', '', ''];
+                    }
+                    
+                    this.appState = 'setup';
+                    this.saveData();
+                },
                 startTournament() {
-                    // Check if any fields are empty and fill with default
                     for (const team in this.baseTeams) {
                         for (let i = 0; i < 3; i++) {
                             if (!this.baseTeams[team][i].trim()) {
@@ -433,39 +625,56 @@
                     this.saveData();
                 },
                 confirmReset() {
-                    // Alert yerine HTML tabanlı custom bir confirm logic yazabiliriz ama prompt kuralları "alert/confirm kullanma" diyor.
-                    // Bu yüzden direkt sıfırlıyorum, istersen buraya özel modal ekleyebilirsin.
-                    this.appState = 'setup';
+                    this.appState = 'mode_select';
+                    this.tournamentMode = null;
                     this.matchResults = {};
                     this.broadcastMode = false;
                     this.saveData();
                 },
-                
-                // Modal İşlemleri
                 openModal(matchId) {
                     let t1Key, t2Key, stealCount = 1;
                     
-                    // Match configurations
-                    if(matchId==='M1') { t1Key='A'; t2Key='B'; }
-                    if(matchId==='M2') { t1Key='C'; t2Key='D'; }
-                    if(matchId==='M3') { t1Key='E'; t2Key='F'; }
-                    if(matchId==='M4') { t1Key='M1W'; t2Key='M2W'; }
-                    if(matchId==='M5') { t1Key='M1L'; t2Key='M2L'; }
-                    if(matchId==='M6') { t1Key='M4L'; t2Key='M5W'; }
-                    if(matchId==='M7') { t1Key='M3W'; t2Key='M6W'; }
-                    if(matchId==='M8') { t1Key='M3L'; t2Key='M6L'; }
-                    if(matchId==='M9') { t1Key='M7L'; t2Key='M8W'; stealCount = 2; } // Büyük final 2 kişi çalar
+                    if (this.tournamentMode === 12) {
+                        if(matchId==='M1') { t1Key='A'; t2Key='B'; }
+                        if(matchId==='M2') { t1Key='C'; t2Key='D'; }
+                        if(matchId==='M3') { t1Key='M1W'; t2Key='M2W'; }
+                        if(matchId==='M4') { t1Key='M1L'; t2Key='M2L'; }
+                        if(matchId==='M5') { t1Key='M3L'; t2Key='M4W'; stealCount = 2; }
+                    } else if (this.tournamentMode === 18) {
+                        if(matchId==='M1') { t1Key='A'; t2Key='B'; }
+                        if(matchId==='M2') { t1Key='C'; t2Key='D'; }
+                        if(matchId==='M3') { t1Key='E'; t2Key='F'; }
+                        if(matchId==='M4') { t1Key='M1W'; t2Key='M2W'; }
+                        if(matchId==='M5') { t1Key='M1L'; t2Key='M2L'; }
+                        if(matchId==='M6') { t1Key='M4L'; t2Key='M5W'; }
+                        if(matchId==='M7') { t1Key='M3W'; t2Key='M6W'; }
+                        if(matchId==='M8') { t1Key='M3L'; t2Key='M6L'; }
+                        if(matchId==='M9') { t1Key='M7L'; t2Key='M8W'; stealCount = 2; }
+                    } else if (this.tournamentMode === 24) {
+                        if(matchId==='M1') { t1Key='A'; t2Key='B'; }
+                        if(matchId==='M2') { t1Key='C'; t2Key='D'; }
+                        if(matchId==='M3') { t1Key='E'; t2Key='F'; }
+                        if(matchId==='M4') { t1Key='G'; t2Key='H'; }
+                        if(matchId==='M5') { t1Key='M1W'; t2Key='M2W'; }
+                        if(matchId==='M6') { t1Key='M3W'; t2Key='M4W'; }
+                        if(matchId==='M7') { t1Key='M1L'; t2Key='M2L'; }
+                        if(matchId==='M8') { t1Key='M3L'; t2Key='M4L'; }
+                        if(matchId==='M9') { t1Key='M5L'; t2Key='M7W'; }
+                        if(matchId==='M10') { t1Key='M6L'; t2Key='M8W'; }
+                        if(matchId==='M11') { t1Key='M9W'; t2Key='M10W'; }
+                        if(matchId==='M12') { t1Key='M9L'; t2Key='M10L'; }
+                        if(matchId==='M13') { t1Key='M11L'; t2Key='M12W'; stealCount = 2; } 
+                    }
                     
                     this.activeMatch = { id: matchId, title: `MAÇ ${matchId.replace('M','')}`, t1Key, t2Key, stealCount };
                     this.modalForm = { winner: null, stolen: [] };
-                    this.modalError = '';
                 },
                 closeModal() {
                     this.activeMatch = null;
                 },
                 selectWinner(side) {
                     this.modalForm.winner = side;
-                    this.modalForm.stolen = []; // kazanan değişirse seçimi sıfırla
+                    this.modalForm.stolen = []; 
                 },
                 getLoserRoster() {
                     if (!this.modalForm.winner) return [];
@@ -477,39 +686,36 @@
                 },
                 saveMatch() {
                     if (!this.isModalValid) return;
-                    
-                    // Sonucu Kaydet
                     this.matchResults[this.activeMatch.id] = {
                         winner: this.modalForm.winner,
                         stolen: [...this.modalForm.stolen]
                     };
-                    
                     this.saveData();
                     this.closeModal();
                 },
                 undoMatch(matchId) {
-                    // Bu maçtan sonraki maçları da silmek gerekir (çünkü kadro değişecek)
-                    // Basitlik için sadece bu maçı siliyoruz, ancak kullanıcı UI'dan anlar.
                     delete this.matchResults[matchId];
                     this.saveData();
                 },
-                
-                // LocalStorage İşlemleri
                 saveData() {
                     const data = {
                         appState: this.appState,
+                        inputPlayerCount: this.inputPlayerCount,
+                        tournamentMode: this.tournamentMode,
                         broadcastMode: this.broadcastMode,
                         baseTeams: this.baseTeams,
                         matchResults: this.matchResults
                     };
-                    localStorage.setItem('wematchData18', JSON.stringify(data));
+                    localStorage.setItem('wematchDynamicData', JSON.stringify(data));
                 },
                 loadData() {
-                    const saved = localStorage.getItem('wematchData18');
+                    const saved = localStorage.getItem('wematchDynamicData');
                     if (saved) {
                         try {
                             const data = JSON.parse(saved);
                             if(data.appState) this.appState = data.appState;
+                            if(data.inputPlayerCount) this.inputPlayerCount = data.inputPlayerCount;
+                            if(data.tournamentMode) this.tournamentMode = data.tournamentMode;
                             if(data.broadcastMode !== undefined) this.broadcastMode = data.broadcastMode;
                             if(data.baseTeams) this.baseTeams = data.baseTeams;
                             if(data.matchResults) this.matchResults = data.matchResults;
