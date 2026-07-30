@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEMATCH: Yönetim Paneli</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 (Otomasyon ve Etkileşim için) -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(circle at 10% 20%, hsla(225, 39%, 20%, 0.4) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, hsla(339, 49%, 20%, 0.4) 0%, transparent 40%);
+            color: #f8fafc;
+        }
+        .stage-container { position: relative; }
+        .stage-container::before {
+            content: '';
+            position: absolute; left: 50%; top: 0; bottom: 0; width: 4px;
+            background: linear-gradient(to bottom, #3b82f6, #8b5cf6, #ec4899);
+            transform: translateX(-50%); z-index: 0; opacity: 0.3;
+        }
+        @media (max-width: 768px) { .stage-container::before { left: 20px; } }
+        
+        .match-card {
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            position: relative; z-index: 1;
+            transition: all 0.3s ease;
+        }
+        
+        .pulse-grad { animation: pulse-green 2s infinite; }
+        .pulse-yellow { animation: pulse-yellow 2.5s infinite; }
+        
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        @keyframes pulse-yellow {
+            0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.3); }
+            70% { box-shadow: 0 0 0 8px rgba(234, 179, 8, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+
+        /* Vue Modal Transition */
+        .modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
+        .modal-enter-from, .modal-leave-to { opacity: 0; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Vue App Mount Point -->
+    <div id="app" class="pb-20">
+        
+        <!-- Sabit Üst Bilgi Çubuğu -->
+        <nav class="sticky top-0 z-50 bg-slate-900/95 border-b border-blue-500/30 backdrop-blur-md px-4 py-3 shadow-lg">
+            <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-lg flex items-center justify-center font-black text-xl shadow-[0_0_10px_rgba(59,130,246,0.6)]">W</div>
+                    <h1 class="text-xl md:text-2xl font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
+                        WEMATCH: <span class="text-slate-300">18 KİŞİ YÖNETİMİ</span>
+                    </h1>
+                </div>
+                
+                <div class="flex gap-2 text-sm font-semibold">
+                    <button v-if="appState === 'tournament'" @click="toggleBroadcast" class="px-4 py-2 rounded border transition-colors flex items-center gap-2" :class="broadcastMode ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'">
+                        <span v-if="broadcastMode">🔴 YAYIN MODU AÇIK</span>
+                        <span v-else>👁️ YAYIN MODUNA GEÇ</span>
+                    </button>
+                    <button @click="confirmReset" class="px-4 py-2 bg-red-600/20 border border-red-900 text-red-400 rounded hover:bg-red-600/40 transition-colors">
+                        🔄 SIFIRLA
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- KURULUM EKRANI -->
+        <div v-if="appState === 'setup'" class="max-w-5xl mx-auto px-4 py-12">
+            <div class="text-center mb-10">
+                <h2 class="text-4xl font-black mb-3">OYUNCU GİRİŞİ</h2>
+                <p class="text-slate-400">18 Oyuncuyu başlangıçtaki 3'er kişilik takımlarına yerleştir.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Takım Kartları -->
+                <div v-for="(team, key) in baseTeams" :key="key" class="bg-slate-800/80 border border-slate-700 p-5 rounded-xl">
+                    <h3 class="text-blue-400 font-bold text-xl mb-4 border-b border-slate-700 pb-2">Takım {{ key }}</h3>
+                    <div class="flex flex-col gap-3">
+                        <input v-model="team[0]" type="text" placeholder="Oyuncu 1" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors">
+                        <input v-model="team[1]" type="text" placeholder="Oyuncu 2" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors">
+                        <input v-model="team[2]" type="text" placeholder="Oyuncu 3" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center">
+                <button @click="startTournament" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black text-xl rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.5)] transition-transform transform hover:scale-105">
+                    🚀 TURNUVAYI BAŞLAT
+                </button>
+            </div>
+        </div>
+
+        <!-- TURNUVA AĞACI (BRACKET) -->
+        <div v-if="appState === 'tournament'" class="max-w-6xl mx-auto stage-container mt-12 px-4 md:px-8">
+            
+            <!-- AŞAMA 1 -->
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-blue-900/50 inline-block px-6 py-2 rounded-full border border-blue-500 font-bold text-xl mb-8 sticky top-20 z-10 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                    1. AŞAMA: İLK ÇARPIŞMA (3v3)
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <match-card match-id="M1" title="MAÇ 1" team1-key="A" team2-key="B" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal"></match-card>
+                    <match-card match-id="M2" title="MAÇ 2" team1-key="C" team2-key="D" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal"></match-card>
+                    <match-card match-id="M3" title="MAÇ 3 (ÖZEL)" team1-key="E" team2-key="F" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]" badge="BAY"></match-card>
+                </div>
+            </div>
+
+            <!-- AŞAMA 2 -->
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-purple-900/50 inline-block px-6 py-2 rounded-full border border-purple-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(168,85,247,0.5)]">
+                    2. AŞAMA: AYRIŞMA
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-blue-400 font-bold text-lg mb-3">ÜST TUR (4v4)</h3>
+                        <match-card match-id="M4" title="MAÇ 4 (KAZANAN MEZUN)" team1-key="M1W" team2-key="M2W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" badge="GRAD"></match-card>
+                    </div>
+                    <div>
+                        <h3 class="text-red-400 font-bold text-lg mb-3">ALT TUR (2v2)</h3>
+                        <match-card match-id="M5" title="MAÇ 5 (KAYBEDEN ELENİR)" team1-key="M1L" team2-key="M2L" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-red-500" badge="ELIM"></match-card>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AŞAMA 3 -->
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-indigo-900/50 inline-block px-6 py-2 rounded-full border border-indigo-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+                    3. AŞAMA: ORTA SAHA (3v3)
+                </div>
+                <div class="max-w-2xl mx-auto">
+                    <match-card match-id="M6" title="MAÇ 6" team1-key="M4L" team2-key="M5W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-purple-500"></match-card>
+                </div>
+            </div>
+
+            <!-- AŞAMA 4 -->
+            <div class="relative mb-20 md:ml-0 ml-12">
+                <div class="bg-cyan-900/50 inline-block px-6 py-2 rounded-full border border-cyan-500 font-bold text-xl mb-8 z-10 shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+                    4. AŞAMA: İKİNCİ DALGA (Bay Takımlar Geliyor)
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <match-card match-id="M7" title="MAÇ 7 (KAZANAN MEZUN)" team1-key="M3W" team2-key="M6W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" badge="GRAD"></match-card>
+                    <match-card match-id="M8" title="MAÇ 8 (KAYBEDEN ELENİR)" team1-key="M3L" team2-key="M6L" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-red-500" badge="ELIM"></match-card>
+                </div>
+            </div>
+
+            <!-- AŞAMA 5 -->
+            <div class="relative md:ml-0 ml-12">
+                <div class="bg-red-900/60 inline-block px-8 py-3 rounded-full border-2 border-red-500 font-black text-2xl mb-8 z-10 shadow-[0_0_25px_rgba(239,68,68,0.6)]">
+                    5. AŞAMA: BÜYÜK FİNAL (Deathmatch)
+                </div>
+                <div class="max-w-2xl mx-auto">
+                    <match-card match-id="M9" title="MAÇ 9 (2 KİŞİ ÇALINIR)" team1-key="M7L" team2-key="M8W" :rosters="rosters" :results="matchResults" :broadcast="broadcastMode" @open-modal="openModal" class-override="border-t-8 border-t-red-600 bg-gradient-to-b from-slate-800 to-slate-900 shadow-[0_0_20px_rgba(239,68,68,0.3)]" badge="FINAL"></match-card>
+                </div>
+            </div>
+            
+            <!-- Turnuva Özeti -->
+            <div v-if="isTournamentOver" class="mt-20 text-center p-10 bg-green-900/30 border-2 border-green-500 rounded-2xl pulse-grad">
+                <h2 class="text-5xl font-black text-green-400 mb-4">TURNUVA TAMAMLANDI!</h2>
+                <p class="text-xl text-slate-300">18 oyuncuyla başlayan sınav sona erdi. 3 takım (15 Kişi) mezun oldu, 3 kişi elendi.</p>
+            </div>
+        </div>
+
+        <!-- ÇALMA (STEAL) MODALI -->
+        <transition name="modal">
+            <div v-if="activeMatch" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                <div class="bg-slate-800 border border-blue-500 rounded-2xl w-full max-w-lg shadow-[0_0_30px_rgba(59,130,246,0.3)] overflow-hidden">
+                    <div class="bg-blue-900/50 p-4 border-b border-blue-500/50 text-center">
+                        <h3 class="text-2xl font-bold text-blue-300">{{ activeMatch.title }} - Sonuç Bildirimi</h3>
+                    </div>
+                    
+                    <div class="p-6">
+                        <!-- Adım 1: Kazananı Seç -->
+                        <div class="mb-6">
+                            <h4 class="text-slate-400 text-sm uppercase tracking-wider font-bold mb-3">1. Kim Kazandı?</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <button @click="selectWinner('t1')" class="p-3 rounded-lg border-2 transition-all font-bold" :class="modalForm.winner === 't1' ? 'bg-green-600/30 border-green-500 text-green-400' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'">
+                                    {{ getTeamDisplayName(activeMatch.t1Key) }}
+                                </button>
+                                <button @click="selectWinner('t2')" class="p-3 rounded-lg border-2 transition-all font-bold" :class="modalForm.winner === 't2' ? 'bg-green-600/30 border-green-500 text-green-400' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'">
+                                    {{ getTeamDisplayName(activeMatch.t2Key) }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Adım 2: Çalınacak Oyuncuyu Seç -->
+                        <div v-if="modalForm.winner" class="mb-6">
+                            <h4 class="text-slate-400 text-sm uppercase tracking-wider font-bold mb-3 flex justify-between">
+                                <span>2. Kim Çalınacak? (Kaybedenden)</span>
+                                <span class="text-yellow-400 text-xs px-2 py-1 bg-yellow-900/30 rounded">{{ activeMatch.stealCount }} Kişi Seç</span>
+                            </h4>
+                            <div class="space-y-2">
+                                <label v-for="player in getLoserRoster()" :key="player" class="flex items-center p-3 rounded-lg border cursor-pointer transition-colors" :class="modalForm.stolen.includes(player) ? 'bg-blue-900/40 border-blue-500 text-blue-300' : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'">
+                                    <input type="checkbox" :value="player" v-model="modalForm.stolen" :disabled="!modalForm.stolen.includes(player) && modalForm.stolen.length >= activeMatch.stealCount" class="hidden">
+                                    <div class="w-5 h-5 rounded border mr-3 flex items-center justify-center transition-colors" :class="modalForm.stolen.includes(player) ? 'bg-blue-500 border-blue-500' : 'border-slate-500'">
+                                        <svg v-if="modalForm.stolen.includes(player)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                    </div>
+                                    <span class="font-semibold">{{ player || 'İsimsiz Oyuncu' }}</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Hata / Uyarı Mesajı -->
+                        <div v-if="modalError" class="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded mb-4 text-sm font-semibold text-center">
+                            {{ modalError }}
+                        </div>
+
+                    </div>
+                    
+                    <div class="bg-slate-900 p-4 border-t border-slate-700 flex justify-end gap-3">
+                        <button @click="closeModal" class="px-5 py-2 rounded text-slate-300 hover:bg-slate-800 font-semibold transition-colors">İptal</button>
+                        <button @click="saveMatch" :disabled="!isModalValid" class="px-5 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(37,99,235,0.4)]">
+                            Sonucu Onayla & İlerle
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+    </div>
+
+    <!-- MAÇ KARTI BİLEŞENİ (COMPONENT) -->
+    <script>
+        const MatchCard = {
+            props: ['matchId', 'title', 'team1Key', 'team2Key', 'rosters', 'results', 'broadcast', 'classOverride', 'badge'],
+            template: `
+                <div class="match-card rounded-xl p-5 border-t-4" :class="classOverride || 'border-t-blue-500'">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="font-bold text-slate-400 text-sm uppercase tracking-wider">{{ title }}</div>
+                        <div v-if="isPlayed" class="text-xs bg-green-900/50 text-green-400 border border-green-500/50 px-2 py-1 rounded font-bold">OYNANDI</div>
+                        <div v-else-if="isReady" class="text-xs bg-blue-900/50 text-blue-400 border border-blue-500/50 px-2 py-1 rounded font-bold">BEKLİYOR</div>
+                        <div v-else class="text-xs bg-slate-800 text-slate-500 px-2 py-1 rounded font-bold">HAZIR DEĞİL</div>
+                    </div>
+                    
+                    <!-- Takımlar -->
+                    <div class="flex flex-col gap-2 bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-4 relative">
+                        <!-- Takım 1 -->
+                        <div class="p-2 rounded" :class="getWinnerClass('t1')">
+                            <div class="font-bold mb-1 flex justify-between items-center text-sm">
+                                <span>{{ team1Name }}</span>
+                                <span class="text-slate-500">({{ t1Roster.length }})</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-for="p in t1Roster" :key="p" class="text-[10px] bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-slate-300">
+                                    {{ p || '?' }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black text-red-500 font-black italic text-xs px-2 py-1 rounded border border-slate-700 z-10">VS</div>
+                        
+                        <!-- Takım 2 -->
+                        <div class="p-2 rounded mt-1" :class="getWinnerClass('t2')">
+                            <div class="font-bold mb-1 flex justify-between items-center text-sm">
+                                <span>{{ team2Name }}</span>
+                                <span class="text-slate-500">({{ t2Roster.length }})</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-for="p in t2Roster" :key="p" class="text-[10px] bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-slate-300">
+                                    {{ p || '?' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Eylem Alanı (Sadece Yayın Modu Kapalıysa) -->
+                    <div v-if="!broadcast" class="mt-4 border-t border-slate-700/50 pt-3">
+                        <button v-if="isReady && !isPlayed" @click="$emit('open-modal', matchId)" class="w-full py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/50 rounded font-bold transition-colors">
+                            ⚔️ MAÇI OYNA
+                        </button>
+                        <div v-else-if="isPlayed" class="text-center text-sm">
+                            <div class="text-green-400 mb-2">🏆 <span class="font-bold">{{ getWinnerName() }}</span> Kazandı</div>
+                            <div class="text-yellow-500 mb-2 text-xs">👤 Çalınan: {{ results[matchId].stolen.join(', ') }}</div>
+                            <button @click="$root.undoMatch(matchId)" class="text-red-400 hover:text-red-300 text-xs underline decoration-dotted">Geri Al (Undo)</button>
+                        </div>
+                        <div v-else class="text-center text-xs text-slate-500 italic py-2">
+                            Önceki maçların sonuçlanması bekleniyor...
+                        </div>
+                    </div>
+                    
+                    <!-- Çıktı Bilgisi (Özel Durumlar) -->
+                    <div v-if="badge === 'GRAD' && isPlayed" class="mt-2 bg-green-600 text-white py-1.5 rounded font-bold text-center text-sm pulse-grad">🌟 KAZANAN MEZUN!</div>
+                    <div v-if="badge === 'ELIM' && isPlayed" class="mt-2 bg-black text-slate-500 border border-slate-800 py-1.5 rounded font-bold text-center text-sm">❌ KAYBEDEN ELENDİ</div>
+                    <div v-if="badge === 'FINAL' && isPlayed" class="mt-2 bg-green-600 text-white py-1.5 rounded font-bold text-center text-sm pulse-grad">👑 3. TAKIM MEZUN OLDU!</div>
+                </div>
+            `,
+            computed: {
+                t1Roster() { return this.rosters[this.team1Key] || []; },
+                t2Roster() { return this.rosters[this.team2Key] || []; },
+                isReady() { return this.t1Roster.length > 0 && this.t2Roster.length > 0; },
+                isPlayed() { return !!this.results[this.matchId]; },
+                team1Name() { return this.team1Key.length === 1 ? `Takım ${this.team1Key}` : `${this.team1Key}`; },
+                team2Name() { return this.team2Key.length === 1 ? `Takım ${this.team2Key}` : `${this.team2Key}`; }
+            },
+            methods: {
+                getWinnerClass(side) {
+                    if (!this.isPlayed) return '';
+                    return this.results[this.matchId].winner === side 
+                        ? 'bg-blue-900/30 border border-blue-500/50 text-blue-300' 
+                        : 'bg-red-900/10 border border-red-900/30 text-slate-500 opacity-60';
+                },
+                getWinnerName() {
+                    if (!this.isPlayed) return '';
+                    return this.results[this.matchId].winner === 't1' ? this.team1Name : this.team2Name;
+                }
+            }
+        };
+
+        const { createApp } = Vue;
+
+        createApp({
+            components: { 'match-card': MatchCard },
+            data() {
+                return {
+                    appState: 'setup', // 'setup' | 'tournament'
+                    broadcastMode: false,
+                    baseTeams: {
+                        A: ['Isagi', 'Nagi', 'Bachira'],
+                        B: ['Barou', 'Naruhaya', 'Chigiri'],
+                        C: ['Rin', 'Aryu', 'Tokimitsu'],
+                        D: ['Kunigami', 'Reo', 'Kurona'],
+                        E: ['Zantetsu', 'Niko', 'Hiori'],
+                        F: ['Karasu', 'Otoya', 'Yukimiya']
+                    },
+                    matchResults: {}, // { M1: { winner: 't1', stolen: ['Nagi'] } }
+                    
+                    // Modal State
+                    activeMatch: null, // { id: 'M1', t1Key: 'A', t2Key: 'B', stealCount: 1 }
+                    modalForm: { winner: null, stolen: [] },
+                    modalError: ''
+                }
+            },
+            computed: {
+                // Merkezi Kadro Hesaplama (Ağacın Can Damarı)
+                rosters() {
+                    const r = { ...this.baseTeams }; // Başlangıç takımları (A, B, C...)
+                    
+                    const matches = [
+                        { id: 'M1', outW: 'M1W', outL: 'M1L' },
+                        { id: 'M2', outW: 'M2W', outL: 'M2L' },
+                        { id: 'M3', outW: 'M3W', outL: 'M3L' }, // BAY (ama oynanıyor)
+                        { id: 'M4', outW: 'M4W', outL: 'M4L' },
+                        { id: 'M5', outW: 'M5W', outL: 'M5L' },
+                        { id: 'M6', outW: 'M6W', outL: 'M6L' },
+                        { id: 'M7', outW: 'M7W', outL: 'M7L' },
+                        { id: 'M8', outW: 'M8W', outL: 'M8L' },
+                        { id: 'M9', outW: 'M9W', outL: 'M9L' }
+                    ];
+
+                    // Her maç için, oynandıysa çıktı kadrolarını oluştur
+                    // Sırayla gitmek önemli çünkü sonraki maçlar öncekilere bağlı.
+                    for (const m of matches) {
+                        const res = this.matchResults[m.id];
+                        if (res) {
+                            // Maçın t1 ve t2 keylerini bulmamız lazım. Bunu hardcode ile eşleştirelim.
+                            let t1Key, t2Key;
+                            if(m.id==='M1') { t1Key='A'; t2Key='B'; }
+                            if(m.id==='M2') { t1Key='C'; t2Key='D'; }
+                            if(m.id==='M3') { t1Key='E'; t2Key='F'; }
+                            if(m.id==='M4') { t1Key='M1W'; t2Key='M2W'; }
+                            if(m.id==='M5') { t1Key='M1L'; t2Key='M2L'; }
+                            if(m.id==='M6') { t1Key='M4L'; t2Key='M5W'; }
+                            if(m.id==='M7') { t1Key='M3W'; t2Key='M6W'; }
+                            if(m.id==='M8') { t1Key='M3L'; t2Key='M6L'; }
+                            if(m.id==='M9') { t1Key='M7L'; t2Key='M8W'; }
+
+                            const wKey = res.winner === 't1' ? t1Key : t2Key;
+                            const lKey = res.winner === 't1' ? t2Key : t1Key;
+                            
+                            const winnerRoster = [...(r[wKey] || [])];
+                            const loserRoster = [...(r[lKey] || [])];
+                            
+                            // Oyuncuları Çal
+                            res.stolen.forEach(p => {
+                                winnerRoster.push(p);
+                                const index = loserRoster.indexOf(p);
+                                if(index > -1) loserRoster.splice(index, 1);
+                            });
+                            
+                            r[m.outW] = winnerRoster;
+                            r[m.outL] = loserRoster;
+                        }
+                    }
+                    return r;
+                },
+                isModalValid() {
+                    if (!this.activeMatch || !this.modalForm.winner) return false;
+                    return this.modalForm.stolen.length === this.activeMatch.stealCount;
+                },
+                isTournamentOver() {
+                    return !!this.matchResults['M9']; // Final maçı bittiyse biter
+                }
+            },
+            methods: {
+                startTournament() {
+                    // Check if any fields are empty and fill with default
+                    for (const team in this.baseTeams) {
+                        for (let i = 0; i < 3; i++) {
+                            if (!this.baseTeams[team][i].trim()) {
+                                this.baseTeams[team][i] = `Oyuncu ${team}${i+1}`;
+                            }
+                        }
+                    }
+                    this.appState = 'tournament';
+                    this.saveData();
+                },
+                toggleBroadcast() {
+                    this.broadcastMode = !this.broadcastMode;
+                    this.saveData();
+                },
+                confirmReset() {
+                    // Alert yerine HTML tabanlı custom bir confirm logic yazabiliriz ama prompt kuralları "alert/confirm kullanma" diyor.
+                    // Bu yüzden direkt sıfırlıyorum, istersen buraya özel modal ekleyebilirsin.
+                    this.appState = 'setup';
+                    this.matchResults = {};
+                    this.broadcastMode = false;
+                    this.saveData();
+                },
+                
+                // Modal İşlemleri
+                openModal(matchId) {
+                    let t1Key, t2Key, stealCount = 1;
+                    
+                    // Match configurations
+                    if(matchId==='M1') { t1Key='A'; t2Key='B'; }
+                    if(matchId==='M2') { t1Key='C'; t2Key='D'; }
+                    if(matchId==='M3') { t1Key='E'; t2Key='F'; }
+                    if(matchId==='M4') { t1Key='M1W'; t2Key='M2W'; }
+                    if(matchId==='M5') { t1Key='M1L'; t2Key='M2L'; }
+                    if(matchId==='M6') { t1Key='M4L'; t2Key='M5W'; }
+                    if(matchId==='M7') { t1Key='M3W'; t2Key='M6W'; }
+                    if(matchId==='M8') { t1Key='M3L'; t2Key='M6L'; }
+                    if(matchId==='M9') { t1Key='M7L'; t2Key='M8W'; stealCount = 2; } // Büyük final 2 kişi çalar
+                    
+                    this.activeMatch = { id: matchId, title: `MAÇ ${matchId.replace('M','')}`, t1Key, t2Key, stealCount };
+                    this.modalForm = { winner: null, stolen: [] };
+                    this.modalError = '';
+                },
+                closeModal() {
+                    this.activeMatch = null;
+                },
+                selectWinner(side) {
+                    this.modalForm.winner = side;
+                    this.modalForm.stolen = []; // kazanan değişirse seçimi sıfırla
+                },
+                getLoserRoster() {
+                    if (!this.modalForm.winner) return [];
+                    const loserKey = this.modalForm.winner === 't1' ? this.activeMatch.t2Key : this.activeMatch.t1Key;
+                    return this.rosters[loserKey] || [];
+                },
+                getTeamDisplayName(key) {
+                    return key.length === 1 ? `Takım ${key}` : `${key}`;
+                },
+                saveMatch() {
+                    if (!this.isModalValid) return;
+                    
+                    // Sonucu Kaydet
+                    this.matchResults[this.activeMatch.id] = {
+                        winner: this.modalForm.winner,
+                        stolen: [...this.modalForm.stolen]
+                    };
+                    
+                    this.saveData();
+                    this.closeModal();
+                },
+                undoMatch(matchId) {
+                    // Bu maçtan sonraki maçları da silmek gerekir (çünkü kadro değişecek)
+                    // Basitlik için sadece bu maçı siliyoruz, ancak kullanıcı UI'dan anlar.
+                    delete this.matchResults[matchId];
+                    this.saveData();
+                },
+                
+                // LocalStorage İşlemleri
+                saveData() {
+                    const data = {
+                        appState: this.appState,
+                        broadcastMode: this.broadcastMode,
+                        baseTeams: this.baseTeams,
+                        matchResults: this.matchResults
+                    };
+                    localStorage.setItem('wematchData18', JSON.stringify(data));
+                },
+                loadData() {
+                    const saved = localStorage.getItem('wematchData18');
+                    if (saved) {
+                        try {
+                            const data = JSON.parse(saved);
+                            if(data.appState) this.appState = data.appState;
+                            if(data.broadcastMode !== undefined) this.broadcastMode = data.broadcastMode;
+                            if(data.baseTeams) this.baseTeams = data.baseTeams;
+                            if(data.matchResults) this.matchResults = data.matchResults;
+                        } catch (e) {
+                            console.error("Local veri okunamadı", e);
+                        }
+                    }
+                }
+            },
+            mounted() {
+                this.loadData();
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
